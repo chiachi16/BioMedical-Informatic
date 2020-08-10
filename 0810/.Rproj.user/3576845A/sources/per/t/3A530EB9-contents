@@ -1,0 +1,23 @@
+library(readr)
+MLL_train <- read_delim("C:/Users/hec6/Downloads/MLL_train.xls", 
+                        "\t", escape_double = FALSE, trim_ws = TRUE)
+MLL_Select<-MLL_train[-grep("AFFX",MLL_train$Name),]
+MLL<-as.matrix(MLL_Select[,-c(1,2)])
+nor<-function(x){
+  min.x<-min(x)
+  max.x<-max(x)
+  (x-min.x)/(max.x-min.x)
+}
+MLL_nor<-t(apply(MLL,1,nor))
+MLL_nor[4704,]
+##T-test
+##分組一 ALL vs others
+install.packages("purrr")
+library(purrr)
+ttest<-function(y){
+  group1test<-t.test(MLL_nor[,y],MLL_nor[,21:57],alternative = "greater")
+  group1pvalue<-c(group1test$p.value)
+}
+result<-map(1:20,ttest)
+group1test<-t.test(MLL_nor[,3],MLL_nor[,21:57],alternative = "greater")
+group1pvalue<-c(group1test$p.value)
