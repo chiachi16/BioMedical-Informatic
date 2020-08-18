@@ -1,0 +1,130 @@
+library(readr)
+library(e1071)
+MLL_train<- read_delim("C:/Users/hec6/Downloads/MLL_train_new.txt", 
+                            "\t", escape_double = FALSE, trim_ws = TRUE)
+MLL_Select<-MLL_train[-grep("AFFX",MLL_train$Name),]
+MLL<-as.matrix(MLL_Select[,-c(1,2)])
+nor<-function(x){
+  min.x<-min(x)
+  max.x<-max(x)
+  (x-min.x)/(max.x-min.x)
+}
+MLL_nor<-t(apply(MLL,1,nor))
+rownames(MLL_nor)<-MLL_Select$Name
+##T-test
+##condition1
+test1<-function(x){
+  t.test(x[1:20],x[21:57],alternative = "greater")$p.value
+}
+C1<-head(sort(apply(MLL_nor,1,test1)),10)
+head(sort(apply(MLL_nor,1,test1)),10)
+##condition2
+test2<-function(x){
+  t.test(x[21:37],x[c(1:20,38:57)],alternative = "greater")$p.value
+}
+C2<-head(sort(apply(MLL_nor,1,test2)),10)
+head(sort(apply(MLL_nor,1,test2)),10)
+##condition1
+test3<-function(x){
+  t.test(x[38:57],x[1:37],alternative = "greater")$p.value
+}
+C3<-head(sort(apply(MLL_nor,1,test3)),10)
+head(sort(apply(MLL_nor,1,test3)),10)
+##Use SVM to execute the classification process
+##A 3-class classification problem using all genes
+x1_test<-t(MLL_nor)
+y1_train<-as.factor(c(gsub("^ALL_\\d+","ALL",c(rownames(x1_test[1:20,]))),
+                    gsub("^MLL_\\d+|^MLL__\\d+","MLL",c(rownames(x1_test[21:37,]))),
+                    gsub("AML_\\d+","AML",c(rownames(x1_test[38:57,])))))
+SVM1<-svm(x1_test,y1_train)
+summary(SVM1)
+result1<-predict(SVM1,x1_test)
+##confusion matrix
+table(result1,y1_train)
+
+##Three 2-class classification problems, each case using all genes
+###condition1(ALL)
+ALL_test<-t(MLL_nor)
+ALL_train<-as.factor(c(gsub("^ALL_\\d+","ALL",c(rownames(x1_test[1:20,]))),
+                      gsub("^MLL_\\d+|^MLL__\\d+|AML_\\d+","MLL/AML",c(rownames(x1_test[21:57,])))))
+SVM_ALL<-svm(ALL_test,ALL_train)
+summary(SVM_ALL)
+result_ALL<-predict(SVM_ALL,ALL_test)
+##confusion matrix
+table(result_ALL,ALL_train)
+
+###condition2(MLL)
+MLL_test<-t(MLL_nor)
+MLL_train<-as.factor(c(gsub("^MLL_\\d+|^MLL__\\d+","MLL",c(rownames(x1_test[21:37,]))),
+                      gsub("^ALL_\\d+|AML_\\d+","ALL/AML",c(rownames(x1_test[c(1:20,38:57),])))))
+SVM_MLL<-svm(MLL_test,MLL_train)
+summary(SVM_MLL)
+result_MLL<-predict(SVM_MLL,MLL_test)
+##confusion matrix
+table(result_MLL,MLL_train)
+###condition3(AML)
+AML_test<-t(MLL_nor)
+AML_train<-as.factor(c(gsub("AML_\\d+","AML",c(rownames(x1_test[38:57,]))),
+                      gsub("^ALL_\\d+|^MLL_\\d+|^MLL__\\d+|","ALL/MLL",c(rownames(x1_test[1:37,])))))
+SVM_AML<-svm(AML_test,AML_train)
+summary(SVM_AML)
+result_AML<-predict(SVM_AML,AML_test)
+##confusion matrix
+table(result_AML,AML_train)
+
+
+##Three 2-class classification problems, each case using 10 selected genes
+###condition1(ALL)
+ALLtop10<-cbind(MLL_nor[rownames(MLL_nor)=="1389_at",],MLL_nor[rownames(MLL_nor)=="34168_at",],
+      MLL_nor[rownames(MLL_nor)=="36239_at",],MLL_nor[rownames(MLL_nor)=="39556_at",],
+      MLL_nor[rownames(MLL_nor)=="32872_at",],MLL_nor[rownames(MLL_nor)=="35260_at",],
+      MLL_nor[rownames(MLL_nor)=="40570_at",],MLL_nor[rownames(MLL_nor)=="963_at",],
+      MLL_nor[rownames(MLL_nor)=="38521_at",],MLL_nor[rownames(MLL_nor)=="34237_at",])
+colnames(ALLtop10)<-rownames(as.matrix(C1))
+SVM3_ALL<-svm(ALLtop10,ALL_train)
+summary(SVM3_ALL)
+result3_ALL<-predict(SVM3_ALL,ALLtop10)
+##confusion matrix
+table(result3_ALL,ALL_train)
+###condition2(MLL)
+MLLtop10<-cbind(MLL_nor[rownames(MLL_nor)=="34306_at",],MLL_nor[rownames(MLL_nor)=="40763_at",],
+                MLL_nor[rownames(MLL_nor)=="1065_at",],MLL_nor[rownames(MLL_nor)=="34583_at",],
+                MLL_nor[rownames(MLL_nor)=="40797_at",],MLL_nor[rownames(MLL_nor)=="34785_at",],
+                MLL_nor[rownames(MLL_nor)=="35985_at",],MLL_nor[rownames(MLL_nor)=="36777_at",],
+                MLL_nor[rownames(MLL_nor)=="1914_at",],MLL_nor[rownames(MLL_nor)=="33936_at",])
+colnames(MLLtop10)<-rownames(as.matrix(C2))
+SVM3_MLL<-svm(MLLtop10,MLL_train)
+summary(SVM3_MLL)
+result3_MLL<-predict(SVM3_MLL,MLLtop10)
+##confusion matrix
+table(result3_MLL,MLL_train)
+
+###condition3(AML)
+AMLtop10<-cbind(MLL_nor[rownames(MLL_nor)=="41752_at",],MLL_nor[rownames(MLL_nor)=="38710_at",],
+                MLL_nor[rownames(MLL_nor)=="41078_at",],MLL_nor[rownames(MLL_nor)=="36162_at",],
+                MLL_nor[rownames(MLL_nor)=="34408_at",],MLL_nor[rownames(MLL_nor)=="689_at",],
+                MLL_nor[rownames(MLL_nor)=="34294_at",],MLL_nor[rownames(MLL_nor)=="39448_r_at",],
+                MLL_nor[rownames(MLL_nor)=="34912_at",],MLL_nor[rownames(MLL_nor)=="37274_at",])
+colnames(AMLtop10)<-rownames(as.matrix(C3))
+SVM3_AML<-svm(AMLtop10,AML_train)
+summary(SVM3_AML)
+result3_AML<-predict(SVM3_AML,AMLtop10)
+##confusion matrix
+table(result3_AML,AML_train)
+
+
+##A 3-class classification problem using the combination of 30 selected genes
+x4_test<-cbind(ALLtop10,MLLtop10,AMLtop10)
+x4_train<-as.factor(c(gsub("^ALL_\\d+","ALL",c(rownames(x1_test[1:20,]))),
+                      gsub("^MLL_\\d+|^MLL__\\d+","MLL",c(rownames(x1_test[21:37,]))),
+                      gsub("AML_\\d+","AML",c(rownames(x1_test[38:57,])))))
+SVM4<-svm(x4_test,x4_train)
+summary(SVM4)
+result4<-predict(SVM4,x4_test)
+##confusion matrix
+table(result4,x4_train)
+
+
+
+
+
